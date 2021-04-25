@@ -40,6 +40,7 @@ import android.view.MenuItem;
 import android.view.SubMenu;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.webkit.WebView;
 import android.webkit.JavascriptInterface;
 import android.widget.FrameLayout;
@@ -78,6 +79,7 @@ import com.ichi2.libanki.Consts;
 import com.ichi2.libanki.Decks;
 import com.ichi2.libanki.Utils;
 import com.ichi2.libanki.sched.Counts;
+import com.ichi2.libanki.sched.DeckDueTreeNode;
 import com.ichi2.themes.Themes;
 import com.ichi2.utils.AndroidUiUtils;
 import com.ichi2.utils.FunctionalInterfaces.Consumer;
@@ -88,6 +90,7 @@ import com.ichi2.widget.WidgetStatus;
 
 import java.lang.ref.WeakReference;
 import java.util.Collections;
+import java.util.List;
 
 import timber.log.Timber;
 
@@ -152,11 +155,17 @@ public class Reviewer extends AbstractFlashcardViewer {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     protected void onCreate(Bundle savedInstanceState) {
         if (showedActivityFailedScreen(savedInstanceState)) {
             return;
         }
         Timber.d("onCreate()");
+
+        // show app before lock screen
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                | WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON);
+
         super.onCreate(savedInstanceState);
 
         if (FirefoxSnackbarWorkaround.handledLaunchFromWebBrowser(getIntent(), this)) {
@@ -168,6 +177,11 @@ public class Reviewer extends AbstractFlashcardViewer {
         if (Intent.ACTION_VIEW.equals(getIntent().getAction())) {
             Timber.d("onCreate() :: received Intent with action = %s", getIntent().getAction());
             selectDeckFromExtra();
+        }
+
+        if (getIntent().getBooleanExtra("AUTO_RUN_REVIEWER", false)) {
+            Timber.d("onCreate() :: received Intent with action = %s", getIntent().getAction());
+            selectDeckWithCardsToStudy();
         }
 
         mColorPalette = findViewById(R.id.whiteboard_pen_color);
@@ -215,6 +229,33 @@ public class Reviewer extends AbstractFlashcardViewer {
         //If we don't know, show it.
         //Otherwise, if it's in the action bar, don't show it again.
         return isShownInActionBar == null || !isShownInActionBar;
+    }
+
+    private void selectDeckWithCardsToStudy() {
+        List<DeckDueTreeNode> nodes = getCol().getSched().deckDueTree();
+
+        long did = getCol().getDecks().selected();
+        for (DeckDueTreeNode node : nodes) {
+            if (did == node.getDid() && (node.getNewCount() + node.getLrnCount() + node.getRevCount()) > 0) {
+                return;
+            }
+        }
+
+        for (DeckDueTreeNode node : nodes) {
+            if (node.getNewCount() + node.getLrnCount() + node.getRevCount() > 0) {
+                did = node.getDid();
+                break;
+            }
+        }
+
+        // Clear the undo history when selecting a new deck
+        if (getCol().getDecks().selected() != did) {
+            getCol().clearUndo();
+        }
+        // Select the deck
+        getCol().getDecks().select(did);
+        // Reset the schedule so that we get the counts for the currently selected deck
+        getCol().getSched().reset();
     }
 
     private void selectDeckFromExtra() {

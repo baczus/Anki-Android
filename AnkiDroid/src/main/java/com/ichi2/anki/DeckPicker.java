@@ -22,6 +22,8 @@
 package com.ichi2.anki;
 
 import android.Manifest;
+import android.annotation.TargetApi;
+import android.app.ActivityManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -107,6 +109,7 @@ import com.ichi2.anki.exception.ConfirmModSchemaException;
 import com.ichi2.anki.exception.DeckRenameException;
 import com.ichi2.anki.exception.FilteredAncestor;
 import com.ichi2.anki.receiver.SdCardReceiver;
+import com.ichi2.anki.services.reviewer.AutoRunReviewerService;
 import com.ichi2.anki.stats.AnkiStatsTaskHandler;
 import com.ichi2.anki.web.HostNumFactory;
 import com.ichi2.anki.widgets.DeckAdapter;
@@ -202,7 +205,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
     private RecyclerView mRecyclerView;
     private LinearLayoutManager mRecyclerViewLayoutManager;
     private DeckAdapter mDeckListAdapter;
-	
+
     private final Snackbar.Callback mSnackbarShowHideCallback = new Snackbar.Callback();
 
     private LinearLayout mNoDecksPlaceholder;
@@ -448,7 +451,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
         if (showedActivityFailedScreen(savedInstanceState)) {
             return;
         }
-        
+
         mCustomStudyDialogFactory = new CustomStudyDialogFactory(this::getCol, this).attachToActivity(this);
 
         //we need to restore here, as we need it before super.onCreate() is called.
@@ -526,6 +529,11 @@ public class DeckPicker extends NavigationDrawerActivity implements
         mReviewSummaryTextView = findViewById(R.id.today_stats_text_view);
 
         mShortAnimDuration = getResources().getInteger(android.R.integer.config_shortAnimTime);
+
+        if (AnkiDroidApp.getSharedPrefs(this).getBoolean("autoRunReviewer", false)
+                && !isServiceRunningInForeground(this, AutoRunReviewerService.class)) {
+            startService(new Intent(this, AutoRunReviewerService.class));
+        }
     }
 
     /**
@@ -599,6 +607,17 @@ public class DeckPicker extends NavigationDrawerActivity implements
             view.setBackground(drawable);
             return true;
         }
+    }
+
+    @SuppressWarnings("deprecation")
+    public static boolean isServiceRunningInForeground(Context context, Class<?> serviceClass) {
+        ActivityManager manager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (serviceClass.getName().equals(service.service.getClassName())) {
+                return service.foreground;
+            }
+        }
+        return false;
     }
 
     /**
@@ -2800,7 +2819,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
                 if (emptyCardTask != null) {
                     confirmCancel(deckPicker, emptyCardTask);
                 }};
-            
+
             deckPicker.mProgressDialog = new MaterialDialog.Builder(deckPicker)
                     .progress(false, mNumberOfCards)
                     .title(R.string.emtpy_cards_finding)

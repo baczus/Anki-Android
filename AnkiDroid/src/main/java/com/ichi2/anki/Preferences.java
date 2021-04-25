@@ -41,6 +41,7 @@ import android.webkit.URLUtil;
 
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.ichi2.anim.ActivityTransitionAnimation;
+import com.ichi2.anki.analytics.UsageAnalytics;
 import com.ichi2.anki.contextmenu.AnkiCardContextMenu;
 import com.ichi2.anki.contextmenu.CardBrowserContextMenu;
 import com.ichi2.anki.debug.DatabaseLock;
@@ -48,6 +49,7 @@ import com.ichi2.anki.exception.ConfirmModSchemaException;
 import com.ichi2.anki.exception.StorageAccessException;
 import com.ichi2.anki.services.BootService;
 import com.ichi2.anki.services.NotificationService;
+import com.ichi2.anki.services.reviewer.AutoRunReviewerService;
 import com.ichi2.anki.web.CustomSyncServer;
 import com.ichi2.compat.CompatHelper;
 import com.ichi2.libanki.Collection;
@@ -60,11 +62,9 @@ import com.ichi2.ui.AppCompatPreferenceActivity;
 import com.ichi2.ui.ConfirmationPreference;
 import com.ichi2.ui.SeekBarPreference;
 import com.ichi2.utils.AdaptionUtil;
-import com.ichi2.utils.LanguageUtil;
-import com.ichi2.anki.analytics.UsageAnalytics;
-import com.ichi2.utils.VersionUtils;
-
 import com.ichi2.utils.JSONObject;
+import com.ichi2.utils.LanguageUtil;
+import com.ichi2.utils.VersionUtils;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -864,6 +864,13 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
                     break;
                 case "gestureCornerTouch": {
                     updateGestureCornerTouch(screen);
+                    break;
+                }
+                case "autoRunReviewer": {
+                    if (!prefs.getBoolean("autoRunReviewer", false)) {
+                        stopService(new Intent(this, AutoRunReviewerService.class));
+                    }
+                    break;
                 }
             }
             // Update the summary text to reflect new value

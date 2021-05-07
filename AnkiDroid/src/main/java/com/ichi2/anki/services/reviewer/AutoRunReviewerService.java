@@ -58,7 +58,7 @@ public class AutoRunReviewerService extends Service {
                 .setContentTitle("AnkiDroid")
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
-                .setSmallIcon(R.drawable.anki)
+                .setSmallIcon(R.drawable.ankidroid_logo)
                 .build();
 
         startForeground(300, notification);

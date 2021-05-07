@@ -211,4 +211,12 @@
     <string name="open_tag_not_closed">Mankas “{{%s}}”.</string>
     <string name="wrong_tag_closed">Trovis “{{/%1$s}}”, sed esperis “{{/%2$s}}”.</string>
     <string name="filter_error">Eraro en filtrilo %s</string>
+    <!-- Sync conflict -->
+    <string name="sync_conflict_message_new">Ne povas kombini la kolektojn.\nKiun kolekton vi volas konservi?</string>
+    <string name="sync_conflict_keep_local_new" comment="Select AnkiDroid files to keep while syncing">AnkiDroid</string>
+    <string name="sync_conflict_keep_remote_new" comment="Select AnkiWeb files to keep while syncing">AnkiWeb</string>
+    <string name="sync_conflict_remote_confirm_new">Ĉu anstataŭigi vian lokan kolekton en AnkiDroid per via fora kolekto el AnkiWeb?</string>
+    <string name="sync_conflict_local_confirm_new">Ĉu anstataŭigi vian foran kolekton AnkiWeb per via loka kolekto el AnkiDroid?</string>
+    <string name="sync_conflict_title_new">Elektu kolekton por konservi</string>
+    <string name="sync_conflict_replace_title">Anstataŭigi kolekton</string>
 </resources>

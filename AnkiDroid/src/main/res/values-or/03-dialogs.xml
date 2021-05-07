@@ -114,6 +114,8 @@
     <string name="import_complete_count">ଆମଦାନୀ ହେଇଥିବା ପତ୍ର: %d</string>
     <string name="sd_card_full_title">SD କାର୍ଡ ପୂର୍ଣ୍ଣ</string>
     <string name="sd_card_almost_full_title">SD କାର୍ଡ ପ୍ରାୟ ପୂର୍ଣ୍ଣ</string>
+    <string name="no_space_to_downgrade_title">ଜାଗା ନାହିଁ</string>
+    <string name="no_space_to_downgrade_content">ଜାରି ରଖିବାକୁ AnkiDroid %s ମାଗଣା ଷ୍ଟୋରେଜ୍ ସ୍ପେସ୍ ଆବଶ୍ୟକ କରେ। ଦୟାକରି କିଛି ସ୍ଥାନ ଖାଲି କରନ୍ତୁ</string>
     <string name="restore_backup_title">ବ୍ୟାକଅପ୍ ପୁନରୁଦ୍ଧାର କରିବେ?</string>
     <string name="restore_backup">ତୁମର ସଂଗ୍ରହ ଏକ ପୁରୁଣା କପି ସହିତ ବଦଳାଯିବ | ଯେକୌଣସି ସଞ୍ଚିତ ଅଗ୍ରଗତି ହଜିଯିବ </string>
     <string name="dialog_cancel">ବାତିଲ</string>
@@ -235,11 +237,11 @@
         <item quantity="one">%d ସେକେଣ୍ଡରେ ଏକ ସ୍ୱୟଂଚାଳିତ ସିଙ୍କ୍ ଚାଳିତ ହୋଇପାରେ</item>
         <item quantity="other">%d ସେକେଣ୍ଡରେ ଏକ ସ୍ୱୟଂଚାଳିତ ସିଙ୍କ୍ ଚାଳିତ ହୋଇପାରେ</item>
     </plurals>
-    <string name="deck_picker_new">Number of new cards to see today in this deck.</string>
-    <string name="deck_picker_rev">Number of cards due today in this deck.</string>
-    <string name="deck_picker_lrn">Number of cards in learning in this deck.</string>
+    <string name="deck_picker_new">ଏହି ଡେକ୍ ରେ ଆଜି ଦେଖିବାକୁ ଥିବା ନୂତନ କାର୍ଡର ସଂଖ୍ୟା।</string>
+    <string name="deck_picker_rev">ଏହି ଡେକ୍ ରେ ଆଜି ପାଇଁ ଧାର୍ଯ୍ୟ ଥିବା ନୂତନ କାର୍ଡର ସଂଖ୍ୟା।</string>
+    <string name="deck_picker_lrn">ଏହି ଡେକ୍ ର ଶିକ୍ଷାଧିନ କାର୍ଡ ସଂଖ୍ୟା।</string>
     <!-- This description is valid fos
     sched V2. For V1, it was counting the number of repetitions of cards in learning. This approximation is acceptable
     for the sake of simplicity and because V1 will leave.-->
-    <string name="deck_picker_counts">Open the deck overview page containing the number of cards to see today.</string>
+    <string name="deck_picker_counts">ଆଜି ଦେଖିବାକୁ ଥିବା କାର୍ଡର ସଂଖ୍ୟା ଧାରଣ କରିଥିବା ଡେକ୍ ବର୍ଣ୍ଣନା ପୃଷ୍ଠା ଖୋଲନ୍ତୁ।</string>
 </resources>

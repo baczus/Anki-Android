@@ -93,7 +93,9 @@ import com.google.android.material.snackbar.Snackbar;
 import com.ichi2.anim.ViewAnimation;
 import com.ichi2.anki.cardviewer.GestureTapProcessor;
 import com.ichi2.anki.cardviewer.MissingImageHandler;
-import com.ichi2.anki.dialogs.TagsDialog;
+import com.ichi2.anki.dialogs.tags.TagsDialog;
+import com.ichi2.anki.dialogs.tags.TagsDialogFactory;
+import com.ichi2.anki.dialogs.tags.TagsDialogListener;
 import com.ichi2.anki.multimediacard.AudioView;
 import com.ichi2.anki.cardviewer.CardAppearance;
 import com.ichi2.anki.receiver.SdCardReceiver;
@@ -167,7 +169,7 @@ import com.github.zafarkhaja.semver.Version;
 import static com.ichi2.anim.ActivityTransitionAnimation.Direction.*;
 
 @SuppressWarnings({"PMD.AvoidThrowingRawExceptionTypes","PMD.FieldDeclarationsShouldBeAtStartOfClass"})
-public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity implements ReviewerUi, CommandProcessor, TagsDialog.TagsDialogListener {
+public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity implements ReviewerUi, CommandProcessor, TagsDialogListener {
 
     /**
      * Result codes that are returned when this activity finishes.
@@ -223,6 +225,8 @@ public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity i
      * Broadcast that informs us when the sd card is about to be unmounted
      */
     private BroadcastReceiver mUnmountReceiver = null;
+
+    private TagsDialogFactory mTagsDialogFactory;
 
     /**
      * Variables to hold preferences
@@ -582,9 +586,6 @@ public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity i
     }
 
 
-    protected final NextCardHandler<BooleanGetter> mDismissCardHandler = new NextCardHandler() { /* superclass is sufficient */ };
-
-
     private final TaskListener<CardGetter, BooleanGetter> mUpdateCardHandler = new TaskListener<CardGetter, BooleanGetter>() {
         private boolean mNoMoreCards;
 
@@ -647,7 +648,7 @@ public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity i
         }
     };
 
-    abstract class NextCardHandler<Result extends BooleanGetter> extends TaskListener<Card, Result> {
+    class NextCardHandler<Result extends BooleanGetter> extends TaskListener<Card, Result> {
         private boolean mNoMoreCards;
 
 
@@ -658,12 +659,7 @@ public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity i
 
 
         @Override
-        public void onProgressUpdate(Card card) {
-            displayNext(card);
-        }
-
-        protected void displayNext(Card nextCard) {
-
+        public void onProgressUpdate(Card nextCard) {
             if (mSched == null) {
                 // TODO: proper testing for restored activity
                 finishWithoutAnimation();
@@ -708,10 +704,7 @@ public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity i
 
         @Override
         public void onPostExecute(Result result) {
-            postNextCardDisplay(result.getBoolean());
-        }
-
-        protected void postNextCardDisplay(boolean displaySuccess) {
+            boolean displaySuccess = result.getBoolean();
             if (!displaySuccess) {
                 // RuntimeException occurred on answering cards
                 closeReviewer(DeckPicker.RESULT_DB_ERROR, false);
@@ -742,15 +735,21 @@ public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity i
         }
     }
 
+    protected class AnswerCardHandler extends NextCardHandler<BooleanGetter> {
 
-    protected NextCardHandler<BooleanGetter> mAnswerCardHandler (boolean quick) {
-        return new NextCardHandler() {
-            @Override
-            public void onPreExecute() {
-                super.onPreExecute();
-                blockControls(quick);
-            }
-        };
+        private final boolean mQuick;
+
+
+        protected AnswerCardHandler(boolean quick) {
+            mQuick = quick;
+        }
+
+
+        @Override
+        public void onPreExecute() {
+            super.onPreExecute();
+            blockControls(mQuick);
+        }
     }
 
 
@@ -947,6 +946,9 @@ public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity i
         Timber.d("onCreate()");
         SharedPreferences preferences = restorePreferences();
         mCardAppearance = CardAppearance.create(new ReviewerCustomFonts(this.getBaseContext()), preferences);
+
+        mTagsDialogFactory = new TagsDialogFactory(this).attachToActivity(this);
+
         super.onCreate(savedInstanceState);
         setContentView(getContentViewAttr(mPrefFullscreenReview));
 
@@ -1371,7 +1373,7 @@ public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity i
 
     protected void undo() {
         if (isUndoAvailable()) {
-            TaskManager.launchCollectionTask(new CollectionTask.Undo(), mAnswerCardHandler(false));
+            TaskManager.launchCollectionTask(new CollectionTask.Undo(), new AnswerCardHandler(false));
         }
     }
 
@@ -1522,7 +1524,7 @@ public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity i
         mSoundPlayer.stopSounds();
         mCurrentEase = ease;
 
-        TaskManager.launchCollectionTask(new CollectionTask.AnswerAndGetCard(mCurrentCard, mCurrentEase), mAnswerCardHandler(true));
+        TaskManager.launchCollectionTask(new CollectionTask.AnswerAndGetCard(mCurrentCard, mCurrentEase), new AnswerCardHandler(true));
     }
 
 
@@ -2649,6 +2651,22 @@ public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity i
         }
     }
 
+    protected boolean buryCard() {
+        return dismiss(new CollectionTask.BuryCard(mCurrentCard));
+    }
+
+    protected boolean suspendCard() {
+        return dismiss(new CollectionTask.SuspendCard(mCurrentCard));
+    }
+
+    protected boolean suspendNote() {
+        return dismiss(new CollectionTask.SuspendNote(mCurrentCard));
+    }
+
+    protected boolean buryNote() {
+        return dismiss(new CollectionTask.BuryNote(mCurrentCard));
+    }
+
     public boolean executeCommand(@ViewerCommandDef int which) {
         if (isControlBlocked() && which != COMMAND_EXIT) {
             return false;
@@ -2705,17 +2723,13 @@ public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity i
                 lookUpOrSelectText();
                 return true;
             case COMMAND_BURY_CARD:
-                dismiss(new CollectionTask.BuryCard(mCurrentCard));
-                return true;
+                return buryCard();
             case COMMAND_BURY_NOTE:
-                dismiss(new CollectionTask.BuryNote(mCurrentCard));
-                return true;
+                return buryNote();
             case COMMAND_SUSPEND_CARD:
-                dismiss(new CollectionTask.SuspendCard(mCurrentCard));
-                return true;
+                return suspendCard();
             case COMMAND_SUSPEND_NOTE:
-                dismiss(new CollectionTask.SuspendNote(mCurrentCard));
-                return true;
+                return suspendNote();
             case COMMAND_DELETE:
                 showDeleteNoteDialog();
                 return true;
@@ -3346,9 +3360,15 @@ public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity i
             } */
     }
 
-    protected void dismiss(CollectionTask.DismissNote dismiss) {
+
+    /**
+     * @param dismiss An action to execute, to ignore current card and get another one
+     * @return whether the action succeeded.
+     */
+    protected boolean dismiss(CollectionTask.DismissNote dismiss) {
         blockControls(false);
-        TaskManager.launchCollectionTask(dismiss, mDismissCardHandler);
+        TaskManager.launchCollectionTask(dismiss, new NextCardHandler());
+        return true;
     }
 
     /** Signals from a WebView represent actions with no parameters */
@@ -3913,7 +3933,7 @@ public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity i
 
     @VisibleForTesting
     void loadInitialCard() {
-        TaskManager.launchCollectionTask(new CollectionTask.GetCard(), mAnswerCardHandler(false));
+        TaskManager.launchCollectionTask(new CollectionTask.GetCard(), new AnswerCardHandler(false));
     }
 
     public ReviewerUi.ControlBlock getControlBlocked() {
@@ -3947,7 +3967,7 @@ public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity i
     protected void showTagsDialog() {
         ArrayList<String> tags = new ArrayList<>(getCol().getTags().all());
         ArrayList<String> selTags = new ArrayList<>(mCurrentCard.note().getTags());
-        TagsDialog dialog = TagsDialog.newInstance(TagsDialog.DialogType.ADD_TAG, selTags, tags);
+        TagsDialog dialog = mTagsDialogFactory.newTagsDialog().withArguments(TagsDialog.DialogType.ADD_TAG, selTags, tags);
         showDialogFragment(dialog);
     }
 

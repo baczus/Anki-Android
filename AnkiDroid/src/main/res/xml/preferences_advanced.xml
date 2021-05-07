@@ -129,7 +129,7 @@
                 android:key="dictionary"
                 android:title="@string/dictionary" />
             <com.ichi2.preferences.CustomDialogPreference
-                android:dialogIcon="@drawable/ic_dialog_alert"
+                android:dialogIcon="@drawable/ic_warning_black"
                 android:dialogMessage="@string/reset_languages_question"
                 android:dialogTitle="@string/reset_languages"
                 android:negativeButtonText="@string/dialog_cancel"
@@ -176,8 +176,8 @@
 
     <CheckBoxPreference
         android:key="schedVer"
-        android:title="@string/sched_ver"
-        android:summary="@string/sched_ver_summ" />
+        android:title="@string/sched_v2"
+        android:summary="@string/sched_v2_summ" />
     <Preference
         android:key="about_dialog_preference"
         android:title="@string/about_title">

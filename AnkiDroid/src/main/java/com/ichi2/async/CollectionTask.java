@@ -99,10 +99,14 @@ import static com.ichi2.utils.BooleanGetter.TRUE;
 /**
  * Loading in the background, so that AnkiDroid does not look like frozen.
  */
-public class CollectionTask<ProgressListener, ProgressBackground extends ProgressListener, ResultListener, ResultBackground extends ResultListener> extends BaseAsyncTask<Void, ProgressBackground, ResultBackground> {
+public class CollectionTask<ProgressBackground, ResultBackground> extends BaseAsyncTask<Void, ProgressBackground, ResultBackground> {
 
     public abstract static class Task<ProgressBackground, ResultBackground> {
         protected abstract ResultBackground task(@NonNull Collection col, @NonNull ProgressSenderAndCancelListener<ProgressBackground> collectionTask);
+
+        protected boolean requiresOpenCollection() {
+            return true;
+        }
     }
 
     /**
@@ -141,11 +145,11 @@ public class CollectionTask<ProgressListener, ProgressBackground extends Progres
     public Task<ProgressBackground, ResultBackground> getTask() {
         return mTask;
     }
-    private final TaskListener<ProgressListener, ResultListener> mListener;
+    private final TaskListener<? super ProgressBackground, ? super ResultBackground> mListener;
     private CollectionTask mPreviousTask;
 
 
-    protected CollectionTask(Task<ProgressBackground, ResultBackground> task, TaskListener<ProgressListener, ResultListener> listener, CollectionTask previousTask) {
+    protected CollectionTask(Task<ProgressBackground, ResultBackground> task, TaskListener<? super ProgressBackground, ? super ResultBackground> listener, CollectionTask previousTask) {
         mTask = task;
         mListener = listener;
         mPreviousTask = previousTask;
@@ -186,7 +190,7 @@ public class CollectionTask<ProgressListener, ProgressBackground extends Progres
         mContext = AnkiDroidApp.getInstance().getApplicationContext();
 
         // Skip the task if the collection cannot be opened
-        if ( mTask.getClass() != RepairCollectionn.class && mTask.getClass() != ImportReplace.class && CollectionHelper.getInstance().getColSafe(mContext) == null) {
+        if (mTask.requiresOpenCollection() && CollectionHelper.getInstance().getColSafe(mContext) == null) {
             Timber.e("CollectionTask CollectionTask %s as Collection could not be opened", mTask.getClass());
             return null;
         }
@@ -1262,7 +1266,7 @@ public class CollectionTask<ProgressListener, ProgressBackground extends Progres
     }
 
 
-    public static class RepairCollectionn extends Task<Void, Boolean> {
+    public static class RepairCollection extends Task<Void, Boolean> {
         protected Boolean task(@NonNull Collection col, @NonNull ProgressSenderAndCancelListener<Void> collectionTask) {
             Timber.d("doInBackgroundRepairCollection");
             if (col != null) {
@@ -1270,6 +1274,11 @@ public class CollectionTask<ProgressListener, ProgressBackground extends Progres
                 col.close(false);
             }
             return BackupManager.repairCollection(col);
+        }
+
+        @Override
+        protected boolean requiresOpenCollection() {
+            return false;
         }
     }
 
@@ -1504,6 +1513,11 @@ public class CollectionTask<ProgressListener, ProgressBackground extends Progres
                 AnkiDroidApp.sendExceptionReport(e, "doInBackgroundImportReplace3");
                 return FALSE;
             }
+        }
+
+        @Override
+        protected boolean requiresOpenCollection() {
+            return false;
         }
     }
 
@@ -1974,10 +1988,10 @@ public class CollectionTask<ProgressListener, ProgressBackground extends Progres
      * @return If there are unselected cards, if there are unmarked cards
      */
     public static class CheckCardSelection extends Task<Void, Pair<Boolean, Boolean>> {
-        private final CardBrowser.CardCollection<CardBrowser.CardCache> mCheckedCards;
+        private final @NonNull Set<CardBrowser.CardCache> mCheckedCards;
 
 
-        public CheckCardSelection(CardBrowser.CardCollection<CardBrowser.CardCache> checkedCards) {
+        public CheckCardSelection(@NonNull Set<CardBrowser.CardCache> checkedCards) {
             this.mCheckedCards = checkedCards;
         }
 

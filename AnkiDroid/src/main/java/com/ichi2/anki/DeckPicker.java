@@ -91,6 +91,8 @@ import com.ichi2.anki.analytics.UsageAnalytics;
 import com.ichi2.anki.dialogs.AsyncDialogFragment;
 import com.ichi2.anki.dialogs.ConfirmationDialog;
 import com.ichi2.anki.dialogs.CreateDeckDialog;
+import com.ichi2.anki.dialogs.DeckPickerNoSpaceToDowngradeDialog;
+import com.ichi2.anki.dialogs.DeckPickerNoSpaceToDowngradeDialog.FileSizeFormatter;
 import com.ichi2.anki.dialogs.customstudy.CustomStudyDialog;
 import com.ichi2.anki.dialogs.DatabaseErrorDialog;
 import com.ichi2.anki.dialogs.DeckPickerAnalyticsOptInDialog;
@@ -106,7 +108,6 @@ import com.ichi2.anki.dialogs.MediaCheckDialog;
 import com.ichi2.anki.dialogs.SyncErrorDialog;
 import com.ichi2.anki.dialogs.customstudy.CustomStudyDialogFactory;
 import com.ichi2.anki.exception.ConfirmModSchemaException;
-import com.ichi2.anki.exception.DeckRenameException;
 import com.ichi2.anki.exception.FilteredAncestor;
 import com.ichi2.anki.receiver.SdCardReceiver;
 import com.ichi2.anki.services.reviewer.AutoRunReviewerService;
@@ -133,7 +134,6 @@ import com.ichi2.libanki.sync.Syncer;
 import com.ichi2.libanki.utils.TimeUtils;
 import com.ichi2.themes.StyledProgressDialog;
 import com.ichi2.ui.BadgeDrawableBuilder;
-import com.ichi2.ui.FixedEditText;
 import com.ichi2.utils.AdaptionUtil;
 import com.ichi2.utils.BooleanGetter;
 import com.ichi2.utils.ImportUtils;
@@ -149,7 +149,6 @@ import com.ichi2.utils.JSONException;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.List;
-import java.util.Locale;
 import java.util.TreeMap;
 
 import timber.log.Timber;
@@ -230,7 +229,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
 
     private String mExportFileName;
 
-    @Nullable private CollectionTask<?, ?, ?, ?> mEmptyCardTask = null;
+    @Nullable private CollectionTask<?, ?> mEmptyCardTask = null;
 
     @VisibleForTesting
     public List<? extends AbstractDeckTreeNode<?>> mDueTree;
@@ -319,6 +318,10 @@ public class DeckPicker extends NavigationDrawerActivity implements
             return true;
         }
     };
+
+    public BackupManager getBackupManager() {
+        return new BackupManager();
+    }
 
     private final ImportAddListener mImportAddListener = new ImportAddListener(this);
     private static class ImportAddListener extends TaskListenerWithContext<DeckPicker, String, Triple<AnkiPackageImporter, Boolean, String>> {
@@ -540,7 +543,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
      * The first call in showing dialogs for startup - error or success.
      * Attempts startup if storage permission has been acquired, else, it requests the permission
      * */
-    private void handleStartup() {
+    public void handleStartup() {
         if (Permissions.hasStorageAccessPermission(this)) {
             boolean colOpen = firstCollectionOpen();
             if (colOpen) {
@@ -579,11 +582,20 @@ public class DeckPicker extends NavigationDrawerActivity implements
                 Timber.i("Displaying database locked error");
                 showDatabaseErrorDialog(DatabaseErrorDialog.DIALOG_DB_LOCKED);
                 break;
+            case DATABASE_DOWNGRADE_REQUIRED:
+                // This has a callback to continue with handleStartup
+                InitialActivity.downgradeBackend(this);
+                break;
             case DB_ERROR:
             default:
-                Timber.i("Displaying database error");
-                showDatabaseErrorDialog(DatabaseErrorDialog.DIALOG_LOAD_FAILED);
+                displayDatabaseFailure();
         }
+    }
+
+
+    public void displayDatabaseFailure() {
+        Timber.i("Displaying database error");
+        showDatabaseErrorDialog(DatabaseErrorDialog.DIALOG_LOAD_FAILED);
     }
 
 
@@ -944,6 +956,11 @@ public class DeckPicker extends NavigationDrawerActivity implements
     protected void onResume() {
         Timber.d("onResume()");
         super.onResume();
+        refreshState();
+    }
+
+
+    public void refreshState() {
         mActivityPaused = false;
         if (mSyncOnResume) {
             Timber.i("Performing Sync on Resume");
@@ -1316,6 +1333,15 @@ public class DeckPicker extends NavigationDrawerActivity implements
         }
     }
 
+    public void displayDowngradeFailedNoSpace() {
+        Timber.w("Not enough space to downgrade");
+        FileSizeFormatter formatter = new FileSizeFormatter(this);
+        String collectionPath = CollectionHelper.getCollectionPath(this);
+        File collectionFile = new File(collectionPath);
+        showDialogFragment(DeckPickerNoSpaceToDowngradeDialog.newInstance(formatter, collectionFile));
+    }
+
+
     @VisibleForTesting
     protected void displayAnalyticsOptInDialog() {
         showDialogFragment(DeckPickerAnalyticsOptInDialog.newInstance());
@@ -1571,7 +1597,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
     // Callback method to handle repairing deck
     public void repairCollection() {
         Timber.i("Repairing the Collection");
-        TaskManager.launchCollectionTask(new CollectionTask.RepairCollectionn(), repairCollectionTask());
+        TaskManager.launchCollectionTask(new CollectionTask.RepairCollection(), repairCollectionTask());
     }
 
 
@@ -2802,7 +2828,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
             mOnePercent = mNumberOfCards / 100;
         }
 
-        private void confirmCancel(@NonNull DeckPicker deckPicker, @NonNull CollectionTask<?, ?, ?, ?>  task) {
+        private void confirmCancel(@NonNull DeckPicker deckPicker, @NonNull CollectionTask<?, ?>  task) {
             new MaterialDialog.Builder(deckPicker)
                     .content(R.string.confirm_cancel)
                     .positiveText(deckPicker.getResources().getString(R.string.yes))
@@ -2815,7 +2841,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
         @Override
         public void actualOnPreExecute(@NonNull DeckPicker deckPicker) {
             DialogInterface.OnCancelListener onCancel = (dialogInterface) -> {
-                CollectionTask<?, ?, ?, ?>  emptyCardTask = deckPicker.mEmptyCardTask;
+                CollectionTask<?, ?>  emptyCardTask = deckPicker.mEmptyCardTask;
                 if (emptyCardTask != null) {
                     confirmCancel(deckPicker, emptyCardTask);
                 }};
@@ -2894,6 +2920,10 @@ public class DeckPicker extends NavigationDrawerActivity implements
         createDeckDialog.showDialog();
     }
 
+    @VisibleForTesting
+    public int getDeckCount() {
+        return mDeckListAdapter.getItemCount();
+    }
 
     @VisibleForTesting
     class CheckDatabaseListener extends TaskListener<String, Pair<Boolean, Collection.CheckDatabaseResult>> {

@@ -46,6 +46,7 @@ import android.view.ViewGroup;
 import android.widget.EditText;
 
 import com.afollestad.materialdialogs.MaterialDialog;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 import com.ichi2.anki.dialogs.ConfirmationDialog;
@@ -61,6 +62,7 @@ import com.ichi2.libanki.Model;
 import com.ichi2.libanki.Models;
 import com.ichi2.themes.StyledProgressDialog;
 
+import com.ichi2.ui.FixedTextView;
 import com.ichi2.utils.FunctionalInterfaces;
 import com.ichi2.utils.JSONArray;
 import com.ichi2.utils.JSONException;
@@ -276,7 +278,8 @@ public class CardTemplateEditor extends AnkiActivity implements DeckSelectionDia
 
 
     @Nullable
-    private CardTemplateFragment getCurrentFragment() {
+    @VisibleForTesting()
+    CardTemplateFragment getCurrentFragment() {
         try {
             return (CardTemplateFragment) getSupportFragmentManager().findFragmentByTag("f" + mViewPager.getCurrentItem());
         } catch (Exception e) {
@@ -339,9 +342,11 @@ public class CardTemplateEditor extends AnkiActivity implements DeckSelectionDia
 
 
     public static class CardTemplateFragment extends Fragment {
-        private EditText mFront;
-        private EditText mCss;
-        private EditText mBack;
+        private FixedTextView mCurrentEdtiorTitle;
+        private EditText mEditorEditText;
+
+        private int mCurrentEditorViewId;
+
         private CardTemplateEditor mTemplateEditor;
         private TabLayoutMediator mTabLayoutMediator;
 
@@ -353,6 +358,17 @@ public class CardTemplateEditor extends AnkiActivity implements DeckSelectionDia
             f.setArguments(args);
             return f;
         }
+
+
+        public int getCurrentEditorViewId() {
+            return mCurrentEditorViewId;
+        }
+
+
+        public void setCurrentEditorViewId(int currentEditorViewId) {
+            mCurrentEditorViewId = currentEditorViewId;
+        }
+
 
         @Override
         public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -369,21 +385,44 @@ public class CardTemplateEditor extends AnkiActivity implements DeckSelectionDia
                 Timber.d(e, "Exception loading template in CardTemplateFragment. Probably stale fragment.");
                 return mainView;
             }
-            // Load EditText Views
-            mFront = mainView.findViewById(R.id.front_edit);
-            mCss = mainView.findViewById(R.id.styling_edit);
-            mBack = mainView.findViewById(R.id.back_edit);
-            // Set EditText content
-            mFront.setText(template.getString("qfmt"));
-            mCss.setText(tempModel.getCss());
-            mBack.setText(template.getString("afmt"));
+
+            // setting to default editor as front template
+            mCurrentEdtiorTitle = mainView.findViewById(R.id.title_edit);
+            mEditorEditText = mainView.findViewById(R.id.editor_editText);
+            mCurrentEditorViewId = R.id.front_edit;
+            mEditorEditText.setText(template.getString("qfmt"));
+            mCurrentEdtiorTitle.setText(R.string.card_template_editor_front);
+
+
+            BottomNavigationView bottomNavigation = mainView.findViewById(R.id.card_template_editor_bottom_navigation);
+            bottomNavigation.setOnNavigationItemSelectedListener(new BottomNavigationView.OnNavigationItemSelectedListener() {
+                @Override
+                public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+                    int currentSelectedId = item.getItemId();
+                    if (currentSelectedId == R.id.styling_edit) {
+                        setCurrentEditorView(currentSelectedId, tempModel.getCss(), R.string.card_template_editor_styling);
+                        return true;
+                    } else if (currentSelectedId == R.id.back_edit) {
+                        setCurrentEditorView(currentSelectedId, template.getString("afmt"), R.string.card_template_editor_back);
+                        return true;
+                    } else {
+                        setCurrentEditorView(currentSelectedId, template.getString("qfmt"), R.string.card_template_editor_front);
+                        return true;
+                    }
+                }
+            });
+
             // Set text change listeners
             TextWatcher templateEditorWatcher = new TextWatcher() {
                 @Override
                 public void afterTextChanged(Editable arg0) {
-                    template.put("qfmt", mFront.getText());
-                    template.put("afmt", mBack.getText());
-                    mTemplateEditor.getTempModel().updateCss(mCss.getText().toString());
+                    if (mCurrentEditorViewId == R.id.styling_edit) {
+                        mTemplateEditor.getTempModel().updateCss(mEditorEditText.getText().toString());
+                    } else if (mCurrentEditorViewId == R.id.back_edit) {
+                        template.put("afmt", mEditorEditText.getText());
+                    } else {
+                        template.put("qfmt", mEditorEditText.getText());
+                    }
                     mTemplateEditor.getTempModel().updateTemplate(position, template);
                 }
 
@@ -395,12 +434,18 @@ public class CardTemplateEditor extends AnkiActivity implements DeckSelectionDia
                 @Override
                 public void onTextChanged(CharSequence arg0, int arg1, int arg2, int arg3) { /* do nothing */ }
             };
-            mFront.addTextChangedListener(templateEditorWatcher);
-            mCss.addTextChangedListener(templateEditorWatcher);
-            mBack.addTextChangedListener(templateEditorWatcher);
+
+            mEditorEditText.addTextChangedListener(templateEditorWatcher);
+
             // Enable menu
             setHasOptionsMenu(true);
             return mainView;
+        }
+
+        public void setCurrentEditorView(@NonNull int id, @NonNull String editorContent, @NonNull int editorTitleId) {
+            setCurrentEditorViewId(id);
+            mEditorEditText.setText(editorContent);
+            mCurrentEdtiorTitle.setText(getResources().getString(editorTitleId));
         }
 
 
